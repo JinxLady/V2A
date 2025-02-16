@@ -37,7 +37,7 @@ def get_video_duration(input_path):
         return None
 
 
-def convert_to_mp3_with_gpu(input_path, output_path):
+def convert_to_mp3(input_path, output_path, quality="vbr", bitrate_or_level="2"):
     if os.path.exists(output_path):
         print(f"Target exists: {output_path}")
         return
@@ -49,6 +49,15 @@ def convert_to_mp3_with_gpu(input_path, output_path):
 
     short_description = "Processing: " + right_shorten_text(input_path, max_length=50)
 
+    audio_quality_args = []
+    if quality == "vbr":
+        audio_quality_args = ["-q:a", bitrate_or_level]
+    elif quality == "cbr":
+        audio_quality_args = ["-b:a", bitrate_or_level]
+    else:
+        print(f"Invalid quality parameter: {quality}")
+        return
+
     with tqdm(total=duration, unit="s", desc=short_description) as pbar:
         process = None
         try:
@@ -58,9 +67,9 @@ def convert_to_mp3_with_gpu(input_path, output_path):
                     "-i", input_path,
                     "-vn",
                     "-c:a", "libmp3lame",
-                    "-b:a", "320k",
-                    output_path
-                ],
+                ]
+                + audio_quality_args
+                + [output_path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True
