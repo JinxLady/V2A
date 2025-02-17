@@ -36,12 +36,34 @@ def get_video_duration(input_path):
         print(e)
         return None
 
-
 def convert_to_mp3(input_path, output_path, quality="vbr", bitrate_or_level="2"):
     if os.path.exists(output_path):
         print(f"Target exists: {output_path}")
         return
 
+    audio_bitrate = None
+    sample_rate = None
+    if input_path.endswith(".webm"):
+        try:
+            probe_result = subprocess.run(
+                [
+                    "ffprobe", "-i", input_path, "-show_streams", "-select_streams", "a",
+                    "-loglevel", "quiet", "-of", "json"
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            import json
+            streams = json.loads(probe_result.stdout).get("streams", [])
+            if streams:
+                audio_bitrate = streams[0].get("bit_rate")
+                sample_rate = streams[0].get("sample_rate")
+        except Exception as e:
+            print("Could not retrieve audio properties from webm file.")
+            print(e)
+
+    use_source_bit_rate = bool(audio_bitrate and sample_rate)
     duration = get_video_duration(input_path)
     if duration is None:
         print(f"Get video duration failed: {input_path}")
@@ -50,7 +72,9 @@ def convert_to_mp3(input_path, output_path, quality="vbr", bitrate_or_level="2")
     short_description = "Processing: " + right_shorten_text(input_path, max_length=50)
 
     audio_quality_args = []
-    if quality == "vbr":
+    if input_path.endswith(".webm") and use_source_bit_rate:
+        audio_quality_args += ["-b:a", f"{int(audio_bitrate) // 1000}k", "-ar", sample_rate]
+    elif quality == "vbr":
         audio_quality_args = ["-q:a", bitrate_or_level]
     elif quality == "cbr":
         audio_quality_args = ["-b:a", bitrate_or_level]
